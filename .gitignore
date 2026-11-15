@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+coverage/
+# wordlists grandes no se versionan
+wordlists/*.txt
+!wordlists/.gitkeep
