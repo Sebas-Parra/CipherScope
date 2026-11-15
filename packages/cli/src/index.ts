@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createReadStream, existsSync } from "node:fs";
+import { createInterface } from "node:readline";
 import { Command } from "commander";
 import pc from "picocolors";
 import {
@@ -9,8 +11,23 @@ import {
   caesarBruteForce,
   vigenereDecode,
   score,
+  crack,
+  isCrackable,
+  parseTarget,
   type HashKind,
+  type SaltMode,
 } from "@cipherscope/core";
+
+/** Itera las líneas de una wordlist de forma perezosa (apto para rockyou). */
+async function* wordlistLines(path: string): AsyncGenerator<string> {
+  const rl = createInterface({
+    input: createReadStream(path, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
+  for await (const line of rl) {
+    if (line.length > 0) yield line;
+  }
+}
 
 const program = new Command();
 
@@ -137,6 +154,103 @@ program
     console.log();
   });
 
+// --- crack ---
+program
+  .command("crack")
+  .argument("<target>", "hash, o formato user:hash / hash:salt")
+  .requiredOption("-w, --wordlist <path>", "ruta a la wordlist (p.ej. rockyou.txt)")
+  .option("-t, --type <kind>", "forzar tipo de hash (md5, sha256, ntlm…)")
+  .option("-s, --salt <salt>", "salt conocido (prueba prefix y suffix)")
+  .option("--salt-mode <mode>", "prefix | suffix (por defecto prueba ambos)")
+  .description("Cracking local por diccionario: hashea candidatos y compara")
+  .action(
+    async (
+      target: string,
+      opts: { wordlist: string; type?: string; salt?: string; saltMode?: string }
+    ) => {
+      if (!existsSync(opts.wordlist)) {
+        console.log(pc.red(`No existe la wordlist: ${opts.wordlist}`));
+        process.exitCode = 1;
+        return;
+      }
+
+      const parsed = parseTarget(target);
+      if (parsed.user) console.log(pc.dim(`Usuario: ${parsed.user}`));
+      const salt = opts.salt ?? parsed.salt;
+
+      // Determinar el tipo: explícito, o el mejor candidato crackeable.
+      let kind = opts.type as HashKind | undefined;
+      if (!kind) {
+        const cand = identify(parsed.hash).candidates.find((c) => isCrackable(c.kind));
+        kind = cand?.kind;
+      }
+      if (!kind || !isCrackable(kind)) {
+        console.log(
+          pc.yellow(
+            `No sé crackear este hash localmente. Usa -t <tipo> o prueba con hashcat/john (cipherscope recommend).`
+          )
+        );
+        return;
+      }
+
+      console.log(
+        pc.bold(`\nCrackeando `) +
+          pc.cyan(kind) +
+          (salt ? pc.dim(` (salt: ${salt})`) : "") +
+          pc.dim(`  wordlist: ${opts.wordlist}\n`)
+      );
+
+      const start = Date.now();
+      let totalAttempts = 0;
+      const BATCH = 50_000;
+      let batch: string[] = [];
+
+      const flush = (): ReturnType<typeof crack> | undefined => {
+        if (batch.length === 0) return undefined;
+        const r = crack(parsed.hash, batch, {
+          kind: kind!,
+          salt,
+          saltMode: opts.saltMode as SaltMode | undefined,
+        });
+        totalAttempts += r.attempts;
+        batch = [];
+        return r;
+      };
+
+      for await (const word of wordlistLines(opts.wordlist)) {
+        batch.push(word);
+        if (batch.length >= BATCH) {
+          const r = flush();
+          if (r?.found) return printCrack(r, parsed, kind, salt, totalAttempts, start);
+        }
+      }
+      const last = flush();
+      if (last?.found) return printCrack(last, parsed, kind, salt, totalAttempts, start);
+
+      const secs = ((Date.now() - start) / 1000).toFixed(1);
+      console.log(
+        pc.red(`✗ No encontrada.`) +
+          pc.dim(` ${totalAttempts.toLocaleString()} intentos en ${secs}s\n`)
+      );
+    }
+  );
+
+function printCrack(
+  r: ReturnType<typeof crack>,
+  parsed: ReturnType<typeof parseTarget>,
+  kind: HashKind,
+  salt: string | undefined,
+  attempts: number,
+  start: number
+): void {
+  const secs = ((Date.now() - start) / 1000).toFixed(2);
+  console.log(pc.green(pc.bold(`\n✓ ¡Contraseña encontrada!\n`)));
+  if (parsed.user) console.log(`  usuario:    ${pc.cyan(parsed.user)}`);
+  console.log(`  contraseña: ${pc.green(pc.bold(r.password ?? ""))}`);
+  console.log(pc.dim(`  tipo: ${kind}${salt ? `  salt(${r.saltMode}): ${salt}` : ""}`));
+  console.log(pc.dim(`  ${attempts.toLocaleString()} intentos en ${secs}s\n`));
+}
+
 // --- analyze (default) ---
 program
   .command("analyze", { isDefault: true })
@@ -162,9 +276,13 @@ program
       console.log();
     }
 
-    // Solo mostramos decodificaciones cuyo resultado parezca texto real;
-    // así un hash que "también es hex válido" no ensucia la salida.
-    const dec = decodeAll(input).filter(({ output }) => score(output).printable > 0.9);
+    // Solo mostramos decodificaciones directas cuyo resultado parezca texto
+    // real; excluimos rot13/atbash (son conjeturas, no decodificación directa)
+    // para que un hash que "también es hex válido" no ensucie la salida.
+    const classic = new Set(["rot13", "atbash"]);
+    const dec = decodeAll(input).filter(
+      ({ decoder, output }) => !classic.has(decoder) && score(output).printable > 0.9
+    );
     if (dec.length > 0) {
       console.log(pc.bold("● Decodificación directa:"));
       for (const { decoder, output } of dec) {

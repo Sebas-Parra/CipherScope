@@ -27,3 +27,15 @@ export type { Score } from "./magic/scorer.js";
 // recommend
 export { recommend } from "./recommend/recommend.js";
 export type { Recommendation } from "./recommend/recommend.js";
+
+// crack (v3)
+export { crack, isCrackable } from "./crack/crack.js";
+export type { CrackOptions, CrackResult } from "./crack/crack.js";
+export { HASHERS } from "./crack/hashers.js";
+export type { Hasher, SaltMode, HashOptions } from "./crack/hashers.js";
+export { VERIFIERS, hasVerifier, isSlowHash } from "./crack/verifiers.js";
+export type { Verifier } from "./crack/verifiers.js";
+export { CHARSETS, resolveCharset, keyspace, generateCandidates } from "./crack/bruteforce.js";
+export { parseTarget } from "./crack/parse.js";
+export type { ParsedTarget } from "./crack/parse.js";
+export { md4 } from "./crack/md4.js";

@@ -12,7 +12,7 @@ export interface Recommendation {
   commands: string[];
 }
 
-const WL = "/usr/share/wordlists/rockyou.txt";
+const WL = "/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt";
 
 const TABLE: Partial<Record<HashKind, Omit<Recommendation, "kind">>> = {
   md5: {

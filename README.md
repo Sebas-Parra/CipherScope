@@ -44,33 +44,86 @@ CipherScope distingue tres mundos que la gente suele confundir:
 - [x] **Cifrados clásicos**: César (fuerza bruta de 25 shifts), Atbash, Vigenère (con llave), análisis de frecuencia.
 
 ### v3 — Ataque integrado
-- [ ] **Cracking local por diccionario** (rockyou y wordlists propias): hashea candidatos y compara.
-- [ ] Soporte de **salts** y formatos `user:hash`.
-- [ ] Interfaz web en Next.js con historial de la sesión.
+- [x] **Cracking local por diccionario** (rockyou y wordlists propias): hashea candidatos y compara.
+- [x] Soporte de **salts** y formatos `user:hash`.
+- [x] Interfaz web en Next.js con historial de la sesión.
 
 ---
 
-## Uso (CLI)
+## Cómo correrlo
+
+### Requisitos
+- **Node.js ≥ 18** y **pnpm** (`npm install -g pnpm` si no lo tienes).
+
+### 1. Instalar y compilar (solo la primera vez)
 
 ```bash
-pnpm install
-pnpm --filter @cipherscope/core build
-pnpm --filter @cipherscope/cli build
-
-# Todo-en-uno: identifica, decodifica y sugiere ataque
-node packages/cli/dist/index.js "<entrada>"
-
-# Comandos específicos
-cipherscope identify 5f4dcc3b5aa765d61d8327deb882cf99   # → MD5 / NTLM / MD4
-cipherscope decode SGVsbG8=                              # → Hello
-cipherscope magic <texto>                                # encadenado Base64→ROT13→…
-cipherscope caesar "Khoor Zruog"                         # 25 shifts
-cipherscope vigenere <texto> -k lemon                    # descifra con llave
-cipherscope recommend bcrypt                             # comando hashcat/john
+pnpm install          # instala dependencias de todo el monorepo
+pnpm build            # compila core + cli + web
 ```
 
-> Durante el desarrollo usa `node packages/cli/dist/index.js <cmd>`. Tras
-> `pnpm link --global` (o `npm i -g`) tendrás el binario `cipherscope`.
+> Si solo quieres la CLI: `pnpm --filter @cipherscope/core build && pnpm --filter @cipherscope/cli build`
+
+### 2. Correr la CLI
+
+```bash
+# Todo-en-uno: identifica, decodifica y sugiere ataque
+node packages/cli/dist/index.js 5f4dcc3b5aa765d61d8327deb882cf99
+
+# Comandos específicos
+node packages/cli/dist/index.js identify 5f4dcc3b5aa765d61d8327deb882cf99   # → MD5 / NTLM / MD4
+node packages/cli/dist/index.js decode SGVsbG8=                              # → Hello
+node packages/cli/dist/index.js magic aGVsbG8gd29ybGQ=                       # encadenado Base64→ROT13→…
+node packages/cli/dist/index.js caesar "Khoor Zruog"                         # 25 shifts
+node packages/cli/dist/index.js vigenere "Lxfopvefrnhr" -k lemon             # descifra con llave
+node packages/cli/dist/index.js recommend bcrypt                             # comando hashcat/john
+```
+
+**Opcional — binario global:** así escribes `cipherscope ...` en vez de `node packages/cli/dist/index.js ...`:
+
+```bash
+pnpm --filter @cipherscope/cli exec npm link
+cipherscope identify 5f4dcc3b5aa765d61d8327deb882cf99
+```
+
+### 3. Correr el cracking (v3)
+
+Necesita una wordlist. Para probar rápido puedes crear una:
+
+```bash
+printf '123456\npassword\nhello\nsecret123\n' > /tmp/wl.txt
+
+# MD5 de "secret123"
+node packages/cli/dist/index.js crack 5d7845ac6ee7cfffafc5fe5f35cf666d -w /tmp/wl.txt
+# NTLM de "password" (forzando el tipo)
+node packages/cli/dist/index.js crack 8846f7eaee8fb117ad06bdd830b7586c -w /tmp/wl.txt -t ntlm
+# Formato user:hash con salt conocido
+node packages/cli/dist/index.js crack admin:<hash> -w /tmp/wl.txt -s s4lt
+```
+
+Con rockyou real (SecLists): `-w /usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt`.
+
+> Tipos crackeables en local (sin libs externas): MD5, SHA-1/224/256/384/512,
+> SHA3-256, RIPEMD-160, **NTLM** (MD4 implementado a mano), MD4, MySQL 3.23/4.1
+> y CRC-32. Para bcrypt/argon2/*crypt usa el comando de `recommend` con hashcat/john.
+
+### 4. Correr la Web
+
+```bash
+pnpm --filter @cipherscope/core build   # la web reusa el core (si no hiciste `pnpm build`)
+pnpm --filter @cipherscope/web dev       # luego abre http://localhost:3000  (Ctrl+C para parar)
+```
+
+Interfaz Next.js (App Router) que llama al core vía Server Action: pega un
+hash/encoding/texto y obtienes identificación, decodificación directa, el
+encadenado "Magic", los 25 shifts de César y un **historial de sesión**
+(persistido en `localStorage`).
+
+### 5. Correr los tests
+
+```bash
+pnpm test             # 35 tests del core (Vitest)
+```
 
 ## Arquitectura
 
