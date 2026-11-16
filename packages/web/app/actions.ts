@@ -148,7 +148,7 @@ function buildPlan(kind: HashKind, hash: string, wordlist: string): CrackRespons
     steps.push({
       n: steps.length + 1,
       title: "Diccionario + reglas (más combinaciones)",
-      cmd: `hashcat -m ${m} -a 0 hash.txt ${wordlist} -r /usr/share/hashcat/rules/best64.rule`,
+      cmd: `hashcat -m ${m} -a 0 hash.txt ${wordlist} -r /usr/share/hashcat/rules/best66.rule`,
     });
   }
   if (rec?.johnFormat) {

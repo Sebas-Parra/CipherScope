@@ -13,15 +13,17 @@ export interface Recommendation {
 }
 
 const WL = "/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt";
+// En Arch el paquete hashcat trae best66.rule (no best64, que es el nombre de Kali/Debian).
+const RULES = "/usr/share/hashcat/rules/best66.rule";
 
 const TABLE: Partial<Record<HashKind, Omit<Recommendation, "kind">>> = {
   md5: {
     hashcatMode: 0,
     johnFormat: "raw-md5",
-    strategy: "Rápido de crackear. Diccionario primero, luego reglas (best64) y máscara.",
+    strategy: "Rápido de crackear. Diccionario primero, luego reglas (best66) y máscara.",
     commands: [
       `hashcat -m 0 -a 0 HASH ${WL}`,
-      `hashcat -m 0 -a 0 HASH ${WL} -r /usr/share/hashcat/rules/best64.rule`,
+      `hashcat -m 0 -a 0 HASH ${WL} -r ${RULES}`,
       `john --format=raw-md5 --wordlist=${WL} HASH`,
     ],
   },
@@ -30,6 +32,12 @@ const TABLE: Partial<Record<HashKind, Omit<Recommendation, "kind">>> = {
     johnFormat: "nt",
     strategy: "Hash de contraseñas Windows. Sin salt → muy rápido. Diccionario + reglas.",
     commands: [`hashcat -m 1000 -a 0 HASH ${WL}`, `john --format=nt --wordlist=${WL} HASH`],
+  },
+  md4: {
+    hashcatMode: 900,
+    johnFormat: "raw-md4",
+    strategy: "32 hex idéntico a MD5/NTLM. Si -m 0 y -m 1000 fallan, prueba MD4.",
+    commands: [`hashcat -m 900 -a 0 HASH ${WL}`, `john --format=raw-md4 --wordlist=${WL} HASH`],
   },
   sha1: {
     hashcatMode: 100,

@@ -136,7 +136,7 @@ export const SIGNATURES: Signature[] = [
     reversible: false,
     pattern: hex(32),
     baseScore: 0.6,
-    note: "32 hex también calza NTLM/MD4. Probar todos con hashcat.",
+    note: "32 hex es ambiguo: prueba los 3 → MD5 (-m 0), NTLM (-m 1000), MD4 (-m 900).",
   },
   {
     kind: "ntlm",
@@ -154,6 +154,7 @@ export const SIGNATURES: Signature[] = [
     reversible: false,
     pattern: hex(32),
     baseScore: 0.2,
+    note: "Misma forma que MD5/NTLM. Si -m 0 y -m 1000 no sacan nada, prueba -m 900.",
   },
   {
     kind: "sha1",
