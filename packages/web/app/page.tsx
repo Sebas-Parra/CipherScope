@@ -115,7 +115,8 @@ export default function Home() {
     (result.candidates.length ||
       result.decodings.length ||
       result.magic.length ||
-      result.caesar.length);
+      result.caesar.length ||
+      result.warning);
 
   return (
     <div className="wrap">
@@ -158,6 +159,23 @@ export default function Home() {
         </div>
       )}
 
+      {result?.warning && (
+        <div className="card">
+          <h2>⚠ Hash malformado</h2>
+          <div className="badhash">
+            <strong>{result.warning.label}</strong> — digest de{" "}
+            <strong>{result.warning.actual}</strong> caracteres (se esperan{" "}
+            <strong>{result.warning.expected}</strong>).
+          </div>
+          <div className="muted" style={{ fontSize: "0.9rem", marginTop: 6 }}>
+            {result.warning.message}
+          </div>
+          <div className="muted" style={{ fontSize: "0.82rem", marginTop: 6 }}>
+            hashcat/john lo rechazarían con <span className="mono">Token length exception</span>.
+          </div>
+        </div>
+      )}
+
       {result?.candidates.length ? (
         <div className="card">
           <h2>Identificación</h2>
@@ -181,6 +199,48 @@ export default function Home() {
                 </div>
               )}
               {c.command && <div className="cmd mono">$ {c.command}</div>}
+              {c.constructions && (
+                <details className="ctor">
+                  <summary>
+                    ¿Te dieron un <strong>salt</strong> aparte? Prueba estas construcciones →
+                  </summary>
+                  <table className="ctor-table mono">
+                    <thead>
+                      <tr>
+                        <th>-m</th>
+                        <th>construcción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {c.constructions.map((x) => {
+                        const salt = crackForm.salt.trim() || "SALT";
+                        const needsSalt = x.mode !== c.constructions![0].mode; // el plano no lleva salt
+                        const target = needsSalt ? `${result.input}:${salt}` : result.input;
+                        const cmd = `echo '${target}' > h.txt; hashcat -m ${x.mode} -a 0 h.txt ${DEFAULT_WORDLIST}`;
+                        return (
+                          <tr key={x.mode}>
+                            <td className="ctor-mode">{x.mode}</td>
+                            <td>
+                              <div>
+                                {x.formula}
+                                <span className="ctor-label"> — {x.label}</span>
+                              </div>
+                              <div className="cmd mono ctor-cmd">$ {cmd}</div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="muted" style={{ fontSize: "0.78rem", marginTop: 6 }}>
+                    Los modos con salt usan el formato <span className="mono">hash:salt</span> (el
+                    plano no lleva salt). Escribe tu salt en el campo del panel de abajo y los
+                    comandos se actualizan solos. Pruébalas en orden hasta que una recupere la
+                    contraseña; si todas dan <span className="mono">Exhausted</span>, repite con{" "}
+                    <span className="mono">-r /usr/share/hashcat/rules/best66.rule</span>.
+                  </div>
+                </details>
+              )}
             </div>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import { SIGNATURES, type HashKind, type Signature } from "./signatures.js";
+import { diagnose, type FormatWarning } from "./diagnose.js";
 
 export interface Candidate {
   kind: HashKind;
@@ -14,6 +15,8 @@ export interface IdentifyResult {
   input: string;
   length: number;
   candidates: Candidate[];
+  /** Aviso de formato si el input parece un hash crypt/bcrypt malformado. */
+  warning?: FormatWarning;
 }
 
 /**
@@ -42,5 +45,8 @@ export function identify(raw: string): IdentifyResult {
 
   matches.sort((a, b) => b.confidence - a.confidence || a.label.localeCompare(b.label));
 
-  return { input, length: input.length, candidates: matches };
+  // Si ninguna firma crypt/bcrypt calzó, revisa si es por un hash malformado.
+  const warning = matches.length === 0 ? diagnose(input) : undefined;
+
+  return { input, length: input.length, candidates: matches, warning };
 }

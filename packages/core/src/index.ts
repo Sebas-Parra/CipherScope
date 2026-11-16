@@ -1,6 +1,8 @@
 // identify
 export { identify } from "./identify/identify.js";
 export type { Candidate, IdentifyResult } from "./identify/identify.js";
+export { diagnose } from "./identify/diagnose.js";
+export type { FormatWarning } from "./identify/diagnose.js";
 export { SIGNATURES } from "./identify/signatures.js";
 export type { HashKind, Signature } from "./identify/signatures.js";
 
@@ -27,6 +29,8 @@ export type { Score } from "./magic/scorer.js";
 // recommend
 export { recommend } from "./recommend/recommend.js";
 export type { Recommendation } from "./recommend/recommend.js";
+export { constructions } from "./recommend/constructions.js";
+export type { Construction } from "./recommend/constructions.js";
 
 // crack (v3)
 export { crack, isCrackable } from "./crack/crack.js";

@@ -7,6 +7,7 @@ import {
   decodeAll,
   magic,
   recommend,
+  constructions,
   caesarBruteForce,
   crack,
   isCrackable,
@@ -19,6 +20,8 @@ import {
   type Candidate,
   type HashKind,
   type SaltMode,
+  type FormatWarning,
+  type Construction,
 } from "@cipherscope/core";
 
 /** Tope de intentos por defecto para hashes lentos (bcrypt): son carísimos. */
@@ -50,10 +53,14 @@ export interface AnalyzeResponse {
     mode?: number;
     /** No tiene atajo: salt + coste → solo hashcat/john con diccionario. */
     noShortcut?: boolean;
+    /** Construcciones con salt/HMAC a probar (hashes rápidos ambiguos). */
+    constructions?: Construction[];
   })[];
   decodings: { decoder: string; output: string }[];
   magic: { chain: string; output: string; score: number }[];
   caesar: { shift: number; text: string }[];
+  /** Aviso si el input parece un hash crypt/bcrypt malformado. */
+  warning?: FormatWarning;
 }
 
 /**
@@ -69,11 +76,13 @@ export async function analyze(raw: string): Promise<AnalyzeResponse> {
   const id = identify(input);
   const candidates = id.candidates.map((c) => {
     const rec = !c.reversible ? recommend(c.kind) : undefined;
+    const ctor = !c.reversible ? constructions(c.kind) : [];
     return {
       ...c,
       command: rec?.commands[0],
       mode: rec?.hashcatMode,
       noShortcut: NO_SHORTCUT.has(c.kind),
+      constructions: ctor.length ? ctor : undefined,
     };
   });
 
@@ -104,7 +113,7 @@ export async function analyze(raw: string): Promise<AnalyzeResponse> {
   const caesar =
     /[a-z]/i.test(input) && input.length < 400 && !looksLikeHash ? caesarBruteForce(input) : [];
 
-  return { input, candidates, decodings, magic: magicResults, caesar };
+  return { input, candidates, decodings, magic: magicResults, caesar, warning: id.warning };
 }
 
 export interface CrackResponse {

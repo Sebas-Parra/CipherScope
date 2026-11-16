@@ -49,6 +49,17 @@ program
   .description("Identifica el tipo por su forma y rankea candidatos")
   .action((input: string) => {
     const r = identify(input);
+    if (r.warning) {
+      console.log(pc.red(`\n⚠ Hash malformado: ${r.warning.label}`));
+      console.log(
+        pc.yellow(
+          `  digest de ${r.warning.actual} caracteres (se esperan ${r.warning.expected}).`
+        )
+      );
+      console.log(pc.dim(`  ${r.warning.message}`));
+      console.log(pc.dim(`  hashcat/john lo rechazarían con "Token length exception".\n`));
+      return;
+    }
     if (r.candidates.length === 0) {
       console.log(pc.yellow("No coincide con ninguna firma conocida."));
       console.log(pc.dim(`(longitud ${r.length}) ¿Será un encoding? Prueba: cipherscope decode`));
